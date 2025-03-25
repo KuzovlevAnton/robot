@@ -60,6 +60,8 @@ class Robot:
         self.S = 185
         self.d = 62.4
 
+        self.gray = 45
+
         self.default_speed = 300
 
         self.number = 0
@@ -174,53 +176,135 @@ class Robot:
 
 
 
+    def empty_pid_reg_right(self,v,kp,ki,kd, offset = 0):
+        error = self.gray - self.LS_right.reflection()
+        self.error_i = error + self.error_i
+        error_d = error - self.last_error
+
+        p = kp * error
+        i = ki * self.error_i
+        d = kd * error_d
+
+        u = p + i + d
+        
+        self.last_error = error
+
+        self.left_motor.run(v + u)
+        self.right_motor.run(v - u + offset)
+        
+        wait(10)
+
+
+    def empty_pid_reg_left(self,v,kp,ki,kd, offset = 0):
+        error = self.LS_left.reflection() - self.gray
+        self.error_i = error + self.error_i
+        error_d = error - self.last_error
+
+        p = kp * error
+        i = ki * self.error_i
+        d = kd * error_d
+
+        u = p + i + d
+        
+        self.last_error = error
+
+        self.left_motor.run(v + u)
+        self.right_motor.run(v - u + offset)
+        
+        wait(10)
+
+
     def empty_pid_reg(self,v,kp,ki,kd, offset = 0):
-            error = self.LS_left.reflection() - self.LS_right.reflection()
-            self.error_i = error + self.error_i
-            error_d = error - self.last_error
+        error = self.LS_left.reflection() - self.LS_right.reflection()
+        self.error_i = error + self.error_i
+        error_d = error - self.last_error
 
-            p = kp * error
-            i = ki * self.error_i
-            d = kd * error_d
+        p = kp * error
+        i = ki * self.error_i
+        d = kd * error_d
 
-            u = p + i + d
-            
-            self.last_error = error
+        u = p + i + d
+        
+        self.last_error = error
 
-            self.left_motor.run(v + u)
-            self.right_motor.run(v - u + offset)
-            
-            wait(10)
+        self.left_motor.run(v + u)
+        self.right_motor.run(v - u + offset)
+        
+        wait(10)
+
+    def empty_pid_reg_inversion(self,v,kp,ki,kd, offset = 0):
+        error = self.LS_right.reflection() - self.LS_left.reflection()
+        self.error_i = error + self.error_i
+        error_d = error - self.last_error
+
+        p = kp * error
+        i = ki * self.error_i
+        d = kd * error_d
+
+        u = p + i + d
+        
+        self.last_error = error
+
+        self.left_motor.run(v + u)
+        self.right_motor.run(v - u + offset)
+        
+        wait(10)
 
 
-    def pid_reg(self,v,kp,ki,kd,n,ride=350):
+    def pid_reg_inversion(self,v,kp,ki,kd,n,ride=40):
         self.error_i = 0
         self.last_error = 0
         for _ in range(n):
-            while self.LS_right.reflection() > 40 or self.LS_left.reflection() > 40:
-                error = self.LS_left.reflection() - self.LS_right.reflection()
-                self.error_i = error + self.error_i
-                error_d = error - self.last_error
+            while self.LS_right.reflection() < 30 or self.LS_left.reflection() < 30:
+                self.empty_pid_reg_inversion(v,kp,ki,kd)
+            if ride:
+                self.ride_mm(v, ride)
+            self.motors_stop()
 
-                p = kp * error
-                i = ki * self.error_i
-                d = kd * error_d
 
-                u = p + i + d
-                
-                self.last_error = error
-
-                self.left_motor.run(v + u)
-                self.right_motor.run(v - u)
-                
-                wait(5)
+    def pid_reg(self,v,kp,ki,kd,n,ride=40):
+        self.error_i = 0
+        self.last_error = 0
+        for _ in range(n):
+            while self.LS_right.reflection() > 30 or self.LS_left.reflection() > 30:
+                self.empty_pid_reg(v,kp,ki,kd)
             if ride:
                 self.ride_mm(v, ride)
             self.motors_stop()
 
 
     def pid_reg_deg(self,v,kp,ki,kd,deg):
-        old_deg = left_motor.angle()
+        old_deg = self.left_motor.angle()
+        self.error_i = 0
+        self.last_error = 0
+        while self.left_motor.angle() - old_deg < deg:
+            self.empty_pid_reg(v,kp,ki,kd)
+        self.left_motor.stop()
+        self.right_motor.stop()
+
+
+    def pid_reg_deg_right(self,v,kp,ki,kd,deg):
+        old_deg = self.left_motor.angle()
+        self.error_i = 0
+        self.last_error = 0
+        while self.left_motor.angle() - old_deg < deg:
+            self.empty_pid_reg_right(v,kp,ki,kd)
+        self.left_motor.stop()
+        self.right_motor.stop()
+
+
+    def pid_reg_deg_left(self,v,kp,ki,kd,deg):
+        old_deg = self.left_motor.angle()
+        self.error_i = 0
+        self.last_error = 0
+        while self.left_motor.angle() - old_deg < deg:
+            self.empty_pid_reg_left(v,kp,ki,kd)
+        self.left_motor.stop()
+        self.right_motor.stop()
+
+
+    def pid_reg_deg(self,v,kp,ki,kd,deg):
+        old_deg = self.left_motor.angle()
         self.error_i = 0
         self.last_error = 0
         while self.left_motor.angle() - old_deg < deg:
@@ -268,6 +352,54 @@ class Robot:
             # ev3.screen.print(filtered[:n])
         return sorted(self.filtered[:n])[n//2]
 
+
+    def border(self, val, min, max):
+        if min > val: val = min
+        if max < val: val = max
+
+        return val
+
+
+    def empty_pid_reg_wall(self,v,kp,ki,kd,S):
+        error = self.border(self.US.distance(), 10, S*2) - S
+        self.error_i = error + self.error_i
+        error_d = error - self.last_error
+
+        p = kp * error
+        i = ki * self.error_i
+        d = kd * error_d
+
+        u = p + i + d
+        
+        self.last_error = error
+
+        self.left_motor.run(v + u)
+        self.right_motor.run(v - u)
+        
+        wait(10)
+
+
+    def wall_ride_line(self,v,kp,ki,kd,S):
+        self.error_i = 0
+        self.last_error = 0
+        while self.LS_left.reflection() > 30:
+            self.empty_pid_reg_wall(v,kp,ki,kd,S)
+        self.motors_stop()
+
+
+    def wall_ride_S(self,v,kp,ki,kd,S,end):
+        self.error_i = 0
+        self.last_error = 0
+        while self.US.distance() < end:
+            self.empty_pid_reg_wall(v,kp,ki,kd,S)
+        self.motors_stop()
+
+    def wall_ride_wall(self,v,kp,ki,kd,S,end):
+        self.error_i = 0
+        self.last_error = 0
+        while self.US2.distance() > end:
+            self.empty_pid_reg_wall(v,kp,ki,kd,S)
+        self.motors_stop()
 
     def enter(self):
         while not Button.CENTER in self.buttons.pressed():
@@ -360,15 +492,7 @@ class Robot:
 
     def main(self):
         # -----------------------------------------------КОД-----------------------------------------------
-        self.pid_reg(300, 2.5, 0, 0, 1)
-        self.anti_turn(1, 500, 500)
-        self.pid_reg(300, 2.5, 0, 0, 1)
-        self.anti_turn(1, 500, 500)
-        self.pid_reg(300, 2.5, 0, 0, 1)
-        self.anti_turn(1, 500, 500)
-        self.pid_reg(300, 2.5, 0, 0, 1)
-        self.anti_turn(1, 500, 500)
-
+        
 
 
 
