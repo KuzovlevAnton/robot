@@ -403,23 +403,23 @@ class Robot:
         self.motors_stop()
 
     def enter(self):
-        while not Button.CENTER in self.buttons.pressed():
-            if Button.UP in self.buttons.pressed():
+        while not Button.CENTER in self.ev3.buttons.pressed():
+            if Button.UP in self.ev3.buttons.pressed():
                 self.number += 1
                 wait(200)
-            if Button.DOWN in self.buttons.pressed():
+            if Button.DOWN in self.ev3.buttons.pressed():
                 self.number -= 1
                 wait(200)
-            if Button.RIGHT in self.buttons.pressed():
+            if Button.RIGHT in self.ev3.buttons.pressed():
                 self.number += 10
-            if Button.LEFT in self.buttons.pressed():
+            if Button.LEFT in self.ev3.buttons.pressed():
                 self.number -= 10
                 wait(50)
             if self.Button1.pressed():
                 self.number = self.number * 10
                 wait(400)
-            self.screen.clear()
-            self.screen.print(self.number)
+            self.ev3.screen.clear()
+            self.ev3.screen.print(self.number)
             wait(10)
 
 
@@ -558,6 +558,10 @@ class Robot:
 
     def screen_draw_circle(self, x, y, r, fill):
         self.ev3.screen.draw_circle(x, y, r, fill)
+        self.ev3.screen.draw_box(x1, y1, x2, y2, r, fill)
+
+    def screen_draw_dot(self, x, y):
+        self.ev3.screen.draw_line(x, y, x, y, 1)
     
     def around_object_to_line(self, r, v):
         while self.LS_left.reflection() > 30:
@@ -581,7 +585,66 @@ class Robot:
                 self.right_motor.run(-1*v)
         self.left_motor.stop()
         self.right_motor.stop() 
+    
+    def line_align_backward(self, v, thereshold=30):
+        while self.LS_left.reflection() > thereshold or self.LS_right.reflection() > thereshold:
+            self.left_motor.run(-v)
+            self.right_motor.run(-v)
+            if self.LS_left.reflection() < thereshold30:
+                while self.LS_left.reflection() < thereshold:
+                    self.left_motor.run(v)
+                    self.right_motor.run(v/2)
+                wait(100)
+            if self.LS_right.reflection() < thereshold:
+                while self.LS_right.reflection() < thereshold:
+                    self.left_motor.run(v/2)
+                    self.right_motor.run(v)
+                wait(100)
+            wait(10)
+        self.motors_stop()
+    
+    def line_align_forward(self, v, thereshold=30):
+        while self.LS_left.reflection() > thereshold or self.LS_right.reflection() > thereshold:
+            self.left_motor.run(v)
+            self.right_motor.run(v)
+            if self.LS_left.reflection() < thereshold:
+                while self.LS_left.reflection() < thereshold:
+                    self.left_motor.run(-v)
+                    self.right_motor.run(-v/2)
+                wait(100)
+            if self.LS_right.reflection() < thereshold:
+                while self.LS_right.reflection() < thereshold:
+                    self.left_motor.run(-v/2)
+                    self.right_motor.run(-v)
+                wait(100)
+            wait(10)
+        self.motors_stop()
 
+
+
+
+    def per_count(self,v,total_len,thereshold=30, round_=1, add=0):
+        pers_list_black=[]
+        pers_list_white=[]
+        self.line_align_forward(50, thereshold)
+        start_deg = self.left_motor.angle()
+        while self.left_motor.angle()-start_deg < self.mm_to_deg(total_len):
+            old_deg = self.left_motor.angle()
+            while self.LS_left.reflection() < thereshold:
+                self.left_motor.run(v)
+                self.right_motor.run(v)
+            pers_list_black.append(floor(self.deg_to_mm(self.left_motor.angle()-old_deg)/round_+add)*round_)
+            old_deg = self.left_motor.angle()
+            if self.left_motor.angle()-start_deg < self.mm_to_deg(total_len):
+                while self.LS_left.reflection() >= thereshold and self.left_motor.angle()-start_deg < self.mm_to_deg(total_len):
+                    self.left_motor.run(v)
+                    self.right_motor.run(v)
+                pers_list_white.append(floor(self.deg_to_mm(self.left_motor.angle()-old_deg)/round_+add)*round_)
+        self.motors_stop()
+        return (pers_list_black, pers_list_white)
+
+        
+        
 
     # def per_count(self,v,kp,ki,kd,ride=500):
     #     pers_list=[]
@@ -609,7 +672,7 @@ class Robot:
 
     def main(self):
         # -----------------------------------------------КОД-----------------------------------------------
-        self.around_object_to_line(500, 300)
+        print(self.per_count(100,250,30,5))
         wait(10000)
 
 
