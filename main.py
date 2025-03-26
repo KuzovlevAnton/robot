@@ -33,8 +33,8 @@ class Robot:
         self.LS_right = ColorSensor(Port.S2)
         self.LS_left = ColorSensor(Port.S3)
     
-        # LS_cube = ColorSensor(Port.S1)
-        # LS_center = ColorSensor(Port.S4)
+        # self.LS_cube = ColorSensor(Port.S4)
+        # self.LS_center = ColorSensor(Port.S4)
 
         self.Button1 = TouchSensor(Port.S1)
 
@@ -74,6 +74,7 @@ class Robot:
         self.filtered = [0, 0, 0]
 
         self.colors_int = {
+            None: 0,
             Color.BLACK: 1,
             Color.BLUE: 2,
             Color.GREEN: 3,
@@ -465,6 +466,122 @@ class Robot:
         self.mid_motor.hold()
 
 
+    def close_deg(self, degrees):
+        self.mid_motor.run_angle(-300, degrees)
+        self.mid_motor.hold()
+
+
+    def objects_count(self, v, S, mm):
+        obj = False
+        n=0
+        deg = self.left_motor.angle()
+        while abs(deg - self.left_motor.angle()) < self.mm_to_deg(mm):
+            self.left_motor.run(v)
+            self.right_motor.run(v)
+            if not obj and self.US.distance() < S:
+                n += 1
+                obj = True
+            
+            if obj and self.US.distance() > S:
+                obj = False
+                wait(100)
+        self.left_motor.stop()
+        self.right_motor.stop()
+        return n
+
+    def to_object(self, v, S, n):
+        obj = False
+        n_current=0
+        deg = self.left_motor.angle()
+        while n_current < n:
+            self.left_motor.run(v)
+            self.right_motor.run(v)
+            if not obj and self.US.distance() < S:
+                n_current += 1
+                obj = True
+            
+            if obj and self.US.distance() > S:
+                obj = False
+                wait(100)
+        self.left_motor.stop()
+        self.right_motor.stop()
+        return self.deg_to_mm(self.left_motor.angle()-deg)
+
+    def to_object_end(self, v, S):
+        obj = False
+        deg = self.left_motor.angle()
+        while self.US.distance() < S:
+            self.left_motor.run(v)
+            self.right_motor.run(v)
+        wait(10)
+        self.left_motor.stop()
+        self.right_motor.stop()
+        return self.deg_to_mm(self.left_motor.angle()-deg)
+
+    def between_objects(self, v, S):
+        self.to_object(v, S, 1)
+        self.ride_mm(v, 10)
+        self.to_object_end(v, S)
+        return self.to_object(v, S, 1)
+
+
+    def object_width(self, v, S):
+        self.to_object(v, S, 1)
+        self.ride_mm(v, 10)
+        return self.to_object_end(v, S)
+
+    def object_height(self, h_max):
+        return h_max - self.US.distance()
+
+    def object_color(self):
+        return self.LS_cube.color()
+    
+    def object_color_int(self):
+        return self.colors_int[self.LS_cube.color()]
+    
+    def object_density(self):
+        self.open()
+        deg = self.mid_motor.angle()
+        self.mid_motor.run_until_stalled(-300, duty_limit=70)
+        self.mid_motor.hold()
+        return self.mid_motor.angle()-deg
+
+    # высота экрана 128 (0-127), ширина 178 (0-177), (0; 0) - в левом верхнем углу
+    def print(self, data):
+        self.ev3.screen.print(data)
+
+    def screen_draw_line(self, x1, x2, y1, y2, widht):
+        self.ev3.screen.draw_line(x1, x2, y1, y2, widht)
+
+    def screen_draw_box(self, x1, y1, x2, y2, r, fill):
+        self.ev3.screen.draw_box(x1, y1, x2, y2, r, fill)
+
+    def screen_draw_circle(self, x, y, r, fill):
+        self.ev3.screen.draw_circle(x, y, r, fill)
+    
+    def around_object_to_line(self, r, v):
+        while self.LS_left.reflection() > 30:
+            if self.US.distance() < r:
+                self.left_motor.run(abs(v))
+                self.right_motor.run(abs(v))
+            if self.US.distance() > r:
+                self.left_motor.run(v)
+                self.right_motor.run(-1*v)
+        self.left_motor.stop()
+        self.right_motor.stop() 
+    
+    def around_object_mm(self, r, v, mm):
+        deg_sum = self.left_motor.angle()+self.right_motor.angle()
+        while abs(deg_sum - self.left_motor.angle() - self.right_motor.angle())/2 < self.mm_to_deg(mm):
+            if self.US.distance() < r:
+                self.left_motor.run(abs(v))
+                self.right_motor.run(abs(v))
+            if self.US.distance() > r:
+                self.left_motor.run(v)
+                self.right_motor.run(-1*v)
+        self.left_motor.stop()
+        self.right_motor.stop() 
+
 
     # def per_count(self,v,kp,ki,kd,ride=500):
     #     pers_list=[]
@@ -492,7 +609,8 @@ class Robot:
 
     def main(self):
         # -----------------------------------------------КОД-----------------------------------------------
-        
+        self.around_object_to_line(500, 300)
+        wait(10000)
 
 
 
