@@ -86,24 +86,24 @@ class Robot:
             Color.PURPLE: 9,
         }
     
-    def beep(self):
+    def beep(self): # гудок
         self.ev3.speaker.beep(300)
 
 
-    def mm_to_deg(self, mm):
+    def mm_to_deg(self, mm): # перевод из миллиметров в градусы
         return mm * 360 / self.d / 3.1415
 
-
-    def deg_to_mm(self, deg):
+    def deg_to_mm(self, deg): # перевод из градусов в миллиметры
         return deg / 360 * self.d * 3.1415
 
 
-    def motors_stop(self):
+    def motors_stop(self): # остановка моторов
         self.left_motor.stop()
         self.right_motor.stop()
 
 
-    def ride_mm(self, v, mm):
+    # езда
+    def ride_mm(self, v, mm): # по миллиметрам
         deg = self.left_motor.angle()
         while abs(deg - self.left_motor.angle()) < self.mm_to_deg(mm):
             self.left_motor.run(v)
@@ -111,8 +111,7 @@ class Robot:
         self.left_motor.stop()
         self.right_motor.stop()
 
-
-    def ride_deg(self, v, degrees):
+    def ride_deg(self, v, degrees): # по градусам
         deg = self.left_motor.angle()
         while abs(deg - self.left_motor.angle()) < degrees:
             self.left_motor.run(v)
@@ -120,29 +119,30 @@ class Robot:
         self.left_motor.stop()
         self.right_motor.stop()
 
-
-    def ride_S_higher(self, v, S):
+    def ride_S_higher(self, v, S): # по расстояния (пока нет стенки)
         while self.US.distance() > S:
             self.left_motor.run(v)
             self.right_motor.run(v)
         self.left_motor.stop()
         self.right_motor.stop()
 
-    def ride_S_lower(self, v, S):
+    def ride_S_lower(self, v, S): # по расстояния (пока есть стенка)
         while self.US.distance() < S:
             self.left_motor.run(v)
             self.right_motor.run(v)
         self.left_motor.stop()
         self.right_motor.stop() 
 
-    def ride_line(self, v, thereshold):
+    def ride_line(self, v, thereshold): # до линии
         while self.LS_left.reflection() > thereshold:
             self.left_motor.run(v)
             self.right_motor.run(v)
         self.left_motor.stop()
         self.right_motor.stop() 
 
-    def curve_v(self, v_left, v_right, mm):
+
+    # езда по кривой
+    def curve_v(self, v_left, v_right, mm): # по 2 скоростям
         deg_sum = self.left_motor.angle()+self.right_motor.angle()
         while abs(deg_sum - self.left_motor.angle() - self.right_motor.angle())/2 < self.mm_to_deg(mm):
             self.left_motor.run(v_left)
@@ -150,7 +150,7 @@ class Robot:
         self.left_motor.stop()
         self.right_motor.stop() 
 
-    def curve_r(self, v, r, mm):
+    def curve_r(self, v, r, mm): # по радиусу
         value = (r+self.S/2)/(r-self.S/2)
         v_right = v
         v_left = v_right*value
@@ -161,8 +161,7 @@ class Robot:
         self.left_motor.stop()
         self.right_motor.stop() 
 
-
-    def curve_angle(self, v, r, angle):
+    def curve_angle(self, v, r, angle): # по углу
         value = (r+self.S/2)/(r-self.S/2)
         v_right = v
         v_left = v_right*value
@@ -175,9 +174,41 @@ class Robot:
         self.right_motor.stop() 
 
 
+    # повороты
+    def tank_turn(self, degrees): # танковый по углу
+        deg = self.left_motor.angle()
+        while abs(self.left_motor.angle() - deg) < abs(degrees) * 180 / self.d:
+            self.left_motor.run(300 * degrees // abs(degrees))
+            self.right_motor.run(-300 * degrees // abs(degrees))
+        self.left_motor.stop()
+        self.right_motor.stop()
+
+    def turn(self, n, v, t, back=0): # по линиям (датчик по направлению поворота (ближний))
+        for _ in range(n):
+            self.left_motor.run(v)
+            self.right_motor.run(-v)
+            wait(t)
+            while ((self.LS_right.reflection() * (v > 0)) + (self.LS_left.reflection() * (v < 0))) > 16:
+                self.left_motor.run(v)
+                self.right_motor.run(-v)
+            self.left_motor.run(-v)
+            self.right_motor.run(v)
+            wait(back)
+            self.motors_stop()
+
+    def anti_turn(self, n, v, t):# по линиям (датчик дальний)
+        for _ in range(n):
+            self.left_motor.run(v)
+            self.right_motor.run(-v)
+            wait(t)
+            while (self.LS_left.reflection() * (v > 0)) + (self.LS_right.reflection() * (v < 0)) > 20:
+                self.left_motor.run(v)
+                self.right_motor.run(-v)
+            self.motors_stop()
 
 
-    def empty_pid_reg_right(self,v,kp,ki,kd, offset = 0):
+    # пид регуляторы без цикла
+    def empty_pid_reg_right(self,v,kp,ki,kd, offset = 0): # по правому датчику
         error = self.gray - self.LS_right.reflection()
         self.error_i = error + self.error_i
         error_d = error - self.last_error
@@ -195,8 +226,7 @@ class Robot:
         
         wait(10)
 
-
-    def empty_pid_reg_left(self,v,kp,ki,kd, offset = 0):
+    def empty_pid_reg_left(self,v,kp,ki,kd, offset = 0): # по левому датчику
         error = self.LS_left.reflection() - self.gray
         self.error_i = error + self.error_i
         error_d = error - self.last_error
@@ -214,8 +244,7 @@ class Robot:
         
         wait(10)
 
-
-    def empty_pid_reg(self,v,kp,ki,kd, offset = 0):
+    def empty_pid_reg(self,v,kp,ki,kd, offset = 0): # по 2 датчикам
         error = self.LS_left.reflection() - self.LS_right.reflection()
         self.error_i = error + self.error_i
         error_d = error - self.last_error
@@ -233,7 +262,7 @@ class Robot:
         
         wait(10)
 
-    def empty_pid_reg_inversion(self,v,kp,ki,kd, offset = 0):
+    def empty_pid_reg_inversion(self,v,kp,ki,kd, offset = 0): # инверсия по 2 датчикам
         error = self.LS_right.reflection() - self.LS_left.reflection()
         self.error_i = error + self.error_i
         error_d = error - self.last_error
@@ -252,18 +281,9 @@ class Robot:
         wait(10)
 
 
-    def pid_reg_inversion(self,v,kp,ki,kd,n,ride=40):
-        self.error_i = 0
-        self.last_error = 0
-        for _ in range(n):
-            while self.LS_right.reflection() < 30 or self.LS_left.reflection() < 30:
-                self.empty_pid_reg_inversion(v,kp,ki,kd)
-            if ride:
-                self.ride_mm(v, ride)
-            self.motors_stop()
 
-
-    def pid_reg(self,v,kp,ki,kd,n,ride=40):
+    # пид регуляторы
+    def pid_reg(self,v,kp,ki,kd,n,ride=40): # по перекрёсткам
         self.error_i = 0
         self.last_error = 0
         for _ in range(n):
@@ -273,8 +293,17 @@ class Robot:
                 self.ride_mm(v, ride)
             self.motors_stop()
 
+    def pid_reg_inversion(self,v,kp,ki,kd,n,ride=40): # инверсия
+        self.error_i = 0
+        self.last_error = 0
+        for _ in range(n):
+            while self.LS_right.reflection() < 30 or self.LS_left.reflection() < 30:
+                self.empty_pid_reg_inversion(v,kp,ki,kd)
+            if ride:
+                self.ride_mm(v, ride)
+            self.motors_stop()
 
-    def pid_reg_deg(self,v,kp,ki,kd,deg):
+    def pid_reg_deg(self,v,kp,ki,kd,deg): # по энкодеру
         old_deg = self.left_motor.angle()
         self.error_i = 0
         self.last_error = 0
@@ -283,8 +312,7 @@ class Robot:
         self.left_motor.stop()
         self.right_motor.stop()
 
-
-    def pid_reg_deg_right(self,v,kp,ki,kd,deg):
+    def pid_reg_deg_right(self,v,kp,ki,kd,deg): # по энкодеру правый датчик
         old_deg = self.left_motor.angle()
         self.error_i = 0
         self.last_error = 0
@@ -293,8 +321,7 @@ class Robot:
         self.left_motor.stop()
         self.right_motor.stop()
 
-
-    def pid_reg_deg_left(self,v,kp,ki,kd,deg):
+    def pid_reg_deg_left(self,v,kp,ki,kd,deg): # по энкодеру левый датчик
         old_deg = self.left_motor.angle()
         self.error_i = 0
         self.last_error = 0
@@ -303,18 +330,7 @@ class Robot:
         self.left_motor.stop()
         self.right_motor.stop()
 
-
-    def pid_reg_deg(self,v,kp,ki,kd,deg):
-        old_deg = self.left_motor.angle()
-        self.error_i = 0
-        self.last_error = 0
-        while self.left_motor.angle() - old_deg < deg:
-            self.empty_pid_reg(v,kp,ki,kd)
-        self.left_motor.stop()
-        self.right_motor.stop()
-
-
-    def pid_reg_4sensors(self,v,kp,ki,kd,n):
+    def pid_reg_4sensors(self,v,kp,ki,kd,n): # по 4 датчикам
         self.error_i = 0
         self.last_error = 0
         for _ in range(n):
@@ -346,22 +362,23 @@ class Robot:
             self.right_motor.stop()
 
 
-    def filter(self, data, n):
+    # работа с уз
+    def filter(self, data, n): # медианный фильтр
         self.filtered.append(data)
         if len(filtered) >= 2*n:
             self.filtered = self.filtered[-1*n:]
             # ev3.screen.print(filtered[:n])
         return sorted(self.filtered[:n])[n//2]
 
-
-    def border(self, val, min, max):
+    def border(self, val, min, max): # граница
         if min > val: val = min
         if max < val: val = max
 
         return val
 
 
-    def empty_pid_reg_wall(self,v,kp,ki,kd,S):
+     # пид регулятор по стене
+    def empty_pid_reg_wall(self,v,kp,ki,kd,S): # без цикла
         error = self.border(self.US.distance(), 10, S*2) - S
         self.error_i = error + self.error_i
         error_d = error - self.last_error
@@ -380,29 +397,30 @@ class Robot:
         wait(10)
 
 
-    def wall_ride_line(self,v,kp,ki,kd,S):
+    def wall_ride_line(self,v,kp,ki,kd,S): # до линии
         self.error_i = 0
         self.last_error = 0
         while self.LS_left.reflection() > 30:
             self.empty_pid_reg_wall(v,kp,ki,kd,S)
         self.motors_stop()
 
-
-    def wall_ride_S(self,v,kp,ki,kd,S,end):
+    def wall_ride_S(self,v,kp,ki,kd,S,end): # до конца стены
         self.error_i = 0
         self.last_error = 0
         while self.US.distance() < end:
             self.empty_pid_reg_wall(v,kp,ki,kd,S)
         self.motors_stop()
 
-    def wall_ride_wall(self,v,kp,ki,kd,S,end):
+    def wall_ride_wall(self,v,kp,ki,kd,S,end): # до стены перед роботом
         self.error_i = 0
         self.last_error = 0
         while self.US2.distance() > end:
             self.empty_pid_reg_wall(v,kp,ki,kd,S)
         self.motors_stop()
 
-    def enter(self):
+
+    # ввод и вывод данных
+    def enter(self): # ввод числа
         while not Button.CENTER in self.ev3.buttons.pressed():
             if Button.UP in self.ev3.buttons.pressed():
                 self.number += 1
@@ -422,56 +440,38 @@ class Robot:
             self.ev3.screen.print(self.number)
             wait(10)
 
+    # высота экрана 128 (0-127), ширина 178 (0-177), (0; 0) - в левом верхнем углу
+    def print(self, data): # вывод текста на дисплей
+        self.ev3.screen.print(data)
 
-    def tank_turn(self, degrees):
-        deg = self.left_motor.angle()
-        while abs(self.left_motor.angle() - deg) < abs(degrees) * 180 / self.d:
-            self.left_motor.run(300 * degrees // abs(degrees))
-            self.right_motor.run(-300 * degrees // abs(degrees))
-        self.left_motor.stop()
-        self.right_motor.stop()
+    def screen_draw_line(self, x1, x2, y1, y2, widht): # вывод линии
+        self.ev3.screen.draw_line(x1, x2, y1, y2, widht)
 
+    def screen_draw_box(self, x1, y1, x2, y2, r, fill): # вывод прямоугольника
+        self.ev3.screen.draw_box(x1, y1, x2, y2, r, fill)
 
-    def turn(self, n, v, t, back=0):
-        for _ in range(n):
-            self.left_motor.run(v)
-            self.right_motor.run(-v)
-            wait(t)
-            while ((self.LS_right.reflection() * (v > 0)) + (self.LS_left.reflection() * (v < 0))) > 16:
-                self.left_motor.run(v)
-                self.right_motor.run(-v)
-            self.left_motor.run(-v)
-            self.right_motor.run(v)
-            wait(back)
-            self.motors_stop()
+    def screen_draw_circle(self, x, y, r, fill): # вывод круга
+        self.ev3.screen.draw_circle(x, y, r, fill)
+        self.ev3.screen.draw_box(x1, y1, x2, y2, r, fill)
+
+    def screen_draw_dot(self, x, y): # вывод точки
+        self.ev3.screen.draw_line(x, y, x, y, 1)
 
 
-    def anti_turn(self, n, v, t):
-        for _ in range(n):
-            self.left_motor.run(v)
-            self.right_motor.run(-v)
-            wait(t)
-            while (self.LS_left.reflection() * (v > 0)) + (self.LS_right.reflection() * (v < 0)) > 20:
-                self.left_motor.run(v)
-                self.right_motor.run(-v)
-            self.motors_stop()
-
-
-    def open(self):
+    # открытие и закрытие захвата
+    def open(self): # открытие захвата
         self.mid_motor.run_until_stalled(300, duty_limit=50)
 
-
-    def close(self):
+    def close(self): # закрытие захвата
         self.mid_motor.run_until_stalled(-300, duty_limit=50)
         self.mid_motor.hold()
 
-
-    def close_deg(self, degrees):
+    def close_deg(self, degrees): # закрытие захвата по градусам
         self.mid_motor.run_angle(-300, degrees)
         self.mid_motor.hold()
 
-
-    def objects_count(self, v, S, mm):
+    # работа с объектами
+    def objects_count(self, v, S, mm): # подсчёт
         obj = False
         n=0
         deg = self.left_motor.angle()
@@ -489,7 +489,7 @@ class Robot:
         self.right_motor.stop()
         return n
 
-    def to_object(self, v, S, n):
+    def to_object(self, v, S, n): # езда к n объекту
         obj = False
         n_current=0
         deg = self.left_motor.angle()
@@ -507,7 +507,7 @@ class Robot:
         self.right_motor.stop()
         return self.deg_to_mm(self.left_motor.angle()-deg)
 
-    def to_object_end(self, v, S):
+    def to_object_end(self, v, S): # к концу объекта
         obj = False
         deg = self.left_motor.angle()
         while self.US.distance() < S:
@@ -518,52 +518,34 @@ class Robot:
         self.right_motor.stop()
         return self.deg_to_mm(self.left_motor.angle()-deg)
 
-    def between_objects(self, v, S):
+    def between_objects(self, v, S): # расстояние между объектами
         self.to_object(v, S, 1)
         self.ride_mm(v, 10)
         self.to_object_end(v, S)
         return self.to_object(v, S, 1)
 
-
-    def object_width(self, v, S):
+    def object_width(self, v, S): # ширина объекта
         self.to_object(v, S, 1)
         self.ride_mm(v, 10)
         return self.to_object_end(v, S)
 
-    def object_height(self, h_max):
+    def object_height(self, h_max): # высота
         return h_max - self.US.distance()
 
-    def object_color(self):
+    def object_color(self): # цвет объекта
         return self.LS_cube.color()
     
-    def object_color_int(self):
+    def object_color_int(self): # цвет объекта по номеру
         return self.colors_int[self.LS_cube.color()]
     
-    def object_density(self):
+    def object_density(self): # "плотность" объекта
         self.open()
         deg = self.mid_motor.angle()
         self.mid_motor.run_until_stalled(-300, duty_limit=70)
         self.mid_motor.hold()
         return self.mid_motor.angle()-deg
 
-    # высота экрана 128 (0-127), ширина 178 (0-177), (0; 0) - в левом верхнем углу
-    def print(self, data):
-        self.ev3.screen.print(data)
-
-    def screen_draw_line(self, x1, x2, y1, y2, widht):
-        self.ev3.screen.draw_line(x1, x2, y1, y2, widht)
-
-    def screen_draw_box(self, x1, y1, x2, y2, r, fill):
-        self.ev3.screen.draw_box(x1, y1, x2, y2, r, fill)
-
-    def screen_draw_circle(self, x, y, r, fill):
-        self.ev3.screen.draw_circle(x, y, r, fill)
-        self.ev3.screen.draw_box(x1, y1, x2, y2, r, fill)
-
-    def screen_draw_dot(self, x, y):
-        self.ev3.screen.draw_line(x, y, x, y, 1)
-    
-    def around_object_to_line(self, r, v):
+    def around_object_to_line(self, r, v): # объезд объекта по расстоянию до него по линии
         while self.LS_left.reflection() > 30:
             if self.US.distance() < r:
                 self.left_motor.run(abs(v))
@@ -574,7 +556,7 @@ class Robot:
         self.left_motor.stop()
         self.right_motor.stop() 
     
-    def around_object_mm(self, r, v, mm):
+    def around_object_mm(self, r, v, mm): # объезд объекта по расстоянию до него по миллиметрам
         deg_sum = self.left_motor.angle()+self.right_motor.angle()
         while abs(deg_sum - self.left_motor.angle() - self.right_motor.angle())/2 < self.mm_to_deg(mm):
             if self.US.distance() < r:
@@ -585,8 +567,10 @@ class Robot:
                 self.right_motor.run(-1*v)
         self.left_motor.stop()
         self.right_motor.stop() 
-    
-    def line_align_backward(self, v, thereshold=30):
+
+
+    # выравнивание
+    def line_align_backward(self, v, thereshold=30): # выравнивание "назад"
         while self.LS_left.reflection() > thereshold or self.LS_right.reflection() > thereshold:
             self.left_motor.run(-v)
             self.right_motor.run(-v)
@@ -603,7 +587,7 @@ class Robot:
             wait(10)
         self.motors_stop()
     
-    def line_align_forward(self, v, thereshold=30):
+    def line_align_forward(self, v, thereshold=30): # выравнивание "вперёд"
         while self.LS_left.reflection() > thereshold or self.LS_right.reflection() > thereshold:
             self.left_motor.run(v)
             self.right_motor.run(v)
@@ -621,9 +605,8 @@ class Robot:
         self.motors_stop()
 
 
-
-
-    def per_count(self,v,total_len,thereshold=30, round_=1, add=0):
+    # штрихкоды
+    def per_count(self,v,total_len,thereshold=30, round_=1, add=0): # считывание чб штрихкода по длинам
         pers_list_black=[]
         pers_list_white=[]
         self.line_align_forward(50, thereshold)
@@ -642,10 +625,9 @@ class Robot:
                 pers_list_white.append(floor(self.deg_to_mm(self.left_motor.angle()-old_deg)/round_+add)*round_)
         self.motors_stop()
         return (pers_list_black, pers_list_white)
-
-        
-        
-
+    
+    
+    
     # def per_count(self,v,kp,ki,kd,ride=500):
     #     pers_list=[]
     #     self.error_i = 0
