@@ -283,7 +283,7 @@ class Robot:
 
 
     # пид регуляторы
-    def pid_reg(self,v,kp,ki,kd,n,ride=40): # по перекрёсткам
+    def pid_reg(self,v,kp,ki,kd,n,ride=20): # по перекрёсткам
         self.error_i = 0
         self.last_error = 0
         for _ in range(n):
@@ -293,7 +293,7 @@ class Robot:
                 self.ride_mm(v, ride)
             self.motors_stop()
 
-    def pid_reg_inversion(self,v,kp,ki,kd,n,ride=40): # инверсия
+    def pid_reg_inversion(self,v,kp,ki,kd,n,ride=20): # инверсия
         self.error_i = 0
         self.last_error = 0
         for _ in range(n):
@@ -365,7 +365,7 @@ class Robot:
     # работа с уз
     def filter(self, data, n): # медианный фильтр
         self.filtered.append(data)
-        if len(filtered) >= 2*n:
+        if len(self.filtered) >= 2*n:
             self.filtered = self.filtered[-1*n:]
             # ev3.screen.print(filtered[:n])
         return sorted(self.filtered[:n])[n//2]
@@ -534,6 +534,9 @@ class Robot:
 
     def object_color(self): # цвет объекта
         return self.LS_cube.color()
+
+    def object_light(self): # свет от объекта
+        return self.LS_cube.ambient()
     
     def object_color_int(self): # цвет объекта по номеру
         return self.colors_int[self.LS_cube.color()]
@@ -626,7 +629,7 @@ class Robot:
         self.motors_stop()
         return (pers_list_black, pers_list_white)
     
-    
+
     
     # def per_count(self,v,kp,ki,kd,ride=500):
     #     pers_list=[]
@@ -652,9 +655,12 @@ class Robot:
     #     return [pers_list, n]
 
 
+
+
+
     def main(self):
         # -----------------------------------------------КОД-----------------------------------------------
-        print(self.per_count(100,250,30,5))
+        
         wait(10000)
 
 
