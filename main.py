@@ -13,10 +13,16 @@ class Robot:
         self.init_vars()
         self.init_hardware()
 
-        self.open()
+        self.close()
+        self.close_deg(-90)
 
-        while not self.Button1.pressed():
+        while not Button.CENTER in self.ev3.buttons.pressed():
+            # print(self.LS_left.reflection(),self.LS_right.reflection(),self.LS_center.reflection(),self.LS_left.reflection()+self.LS_right.reflection()+self.LS_center.reflection())
             ...
+
+        # while not self.Button1.pressed():
+        #     ...
+        
 
 
     def init_hardware(self):
@@ -25,7 +31,7 @@ class Robot:
         self.left_motor = Motor(Port.C, Direction.COUNTERCLOCKWISE)
         self.right_motor = Motor(Port.B)
 
-        self.mid_motor = Motor(Port.A)
+        self.mid_motor = Motor(Port.A, Direction.COUNTERCLOCKWISE)
 
         self.deg_enc = self.left_motor.angle()
 
@@ -36,7 +42,7 @@ class Robot:
         # self.LS_cube = ColorSensor(Port.S4)
         # self.LS_center = ColorSensor(Port.S4)
 
-        self.Button1 = TouchSensor(Port.S1)
+        # self.Button1 = TouchSensor(Port.S1)
 
         # self.LS_side_right = ColorSensor(Port.S4)
         # self.LS_side_left = ColorSensor(Port.S1)
@@ -57,8 +63,11 @@ class Robot:
 
         self.timer = StopWatch()
 
-        self.S = 185
+        self.S = 187
         self.d = 62.4
+
+        self.min_sensor_data = 3
+        self.max_sensor_data = 64
 
         self.gray = 45
 
@@ -85,6 +94,156 @@ class Robot:
             Color.ORANGE: 8,
             Color.PURPLE: 9,
         }
+
+    
+    def calibrate(self):
+        """"""
+        v=100
+        degrees=720
+        max_ = 0
+        min_ = 100
+        deg = self.left_motor.angle()
+        while abs(self.left_motor.angle() - deg) < abs(degrees) * self.S / self.d:
+            self.left_motor.run(v * degrees // abs(degrees))
+            self.right_motor.run(-v * degrees // abs(degrees))
+            if max(self.LS_right.reflection(), self.LS_left.reflection(), self.LS_center.reflection()) > max_:
+                max_ = max(self.LS_right.reflection(), self.LS_left.reflection(), self.LS_center.reflection())
+            if min(self.LS_right.reflection(), self.LS_left.reflection(), self.LS_center.reflection()) < min_:
+                min_ = min(self.LS_right.reflection(), self.LS_left.reflection(), self.LS_center.reflection())
+            wait(50)
+        self.left_motor.stop()
+        self.right_motor.stop()
+        self.min_sensor_data = min_
+        self.max_sensor_data = max_
+        print(min_, max_)
+    
+
+    def smooth_run(self, v_max, v_min, a_max, deg_remains):
+        speed=(self.left_motor.speed()+self.right_motor.speed())/2
+        max_deg=a_max*10*(speed/(a_max*20))**2*1.4
+
+        if abs(max_deg) >= abs(deg_remains):
+            if abs(speed-a_max) > abs(v_min):
+                self.left_motor.run(speed-a_max)
+                self.right_motor.run(speed-a_max)
+            else:
+                self.left_motor.run(v_min)
+                self.right_motor.run(v_min)
+        else:
+            if abs(speed + a_max) < abs(v_max):
+                self.left_motor.run(speed + a_max)
+                self.right_motor.run(speed + a_max)
+            else:
+                self.left_motor.run(v_max)
+                self.right_motor.run(v_max)
+        wait(50)
+    
+    def smooth_ride_mm(self, v_max, v_min, a_max, mm):
+        deg = self.left_motor.angle()
+        while abs(deg - self.left_motor.angle()) < self.mm_to_deg(mm):
+            self.smooth_run(v_max, v_min, a_max, self.mm_to_deg(mm)-abs(deg - self.left_motor.angle()))
+        self.left_motor.stop()
+        self.right_motor.stop()
+
+
+    def smooth_turn(self, v_max, v_min, a_max, deg_remains):
+        speed=(-self.left_motor.speed()+self.right_motor.speed())/2
+        max_deg=a_max*10*(speed/(a_max*20))**2*1.4
+
+        if abs(max_deg) >= abs(deg_remains):
+            if abs(speed-a_max) > abs(v_min):
+                self.left_motor.run(-speed+a_max)
+                self.right_motor.run(speed-a_max)
+            else:
+                self.left_motor.run(-v_min)
+                self.right_motor.run(v_min)
+        else:
+            if abs(speed + a_max) < abs(v_max):
+                self.left_motor.run(-speed - a_max)
+                self.right_motor.run(speed + a_max)
+            else:
+                self.left_motor.run(-v_max)
+                self.right_motor.run(v_max)
+        wait(50)
+
+    
+    def smooth_tank_turn(self, v_max, v_min, a_max, degrees):
+        deg = self.left_motor.angle()
+        while abs(self.left_motor.angle() - deg) < abs(degrees) * self.S / self.d:
+            self.smooth_turn(-v_max * degrees // abs(degrees), -v_min * degrees // abs(degrees), -a_max * degrees // abs(degrees), self.deg_to_mm(abs(degrees) * 180 / self.d - abs(self.left_motor.angle() - deg)))
+        self.left_motor.stop()
+        self.right_motor.stop()
+
+    # def smooth_run_2(self, v_max_left, v_max_right, v_min, a_max, deg_remains):
+        # speed=(self.left_motor.speed()+self.right_motor.speed())/2
+        # max_deg=a_max*10*(speed/(a_max*20))**2*1.4
+
+        # if max_deg >= deg_remains:
+        #     if speed-a_max > v_min:
+        #         self.left_motor.run(speed-a_max)
+        #         self.right_motor.run(speed-a_max)
+        #     else:
+        #         self.left_motor.run(v_min)
+        #         self.right_motor.run(v_min)
+        # else:
+        #     if speed + a_max < v_max:
+        #         self.left_motor.run(speed + a_max)
+        #         self.right_motor.run(speed + a_max)
+        #     elif speed + a_max >= v_max:
+        #         self.left_motor.run(v_max)
+        #         self.right_motor.run(v_max)
+        # wait(50)
+
+    # def right_smooth_run(self, v_max, a_max, deg_remains, kp, ki, kd):
+
+        
+    #     error = deg_remains
+    #     self.error_i = error + self.error_i
+    #     error_d = error - self.last_error
+
+    #     p = kp * error
+    #     i = ki * self.error_i
+    #     d = kd * error_d
+
+    #     u = p + i + d
+        
+    #     self.last_error = error
+
+    #     if u > v_max: u = v_max
+
+    #     self.right_motor.run(u)
+        
+    #     wait(10)
+
+        
+    
+    # def left_smooth_run(self, v_max, a_max, deg_remains, kp, ki, kd):
+
+        
+    #     error = deg_remains
+    #     self.error_i = error + self.error_i
+    #     error_d = error - self.last_error
+
+    #     p = kp * error
+    #     i = ki * self.error_i
+    #     d = kd * error_d
+
+    #     u = p + i + d
+        
+    #     self.last_error = error
+
+    #     if u > v_max: u = v_max
+
+    #     self.left_motor.run(u)
+        
+    #     wait(10)
+        
+        
+    def change_range(self, value, start1, end1, start2, end2):
+        k1 = end1 - start1
+        k2 = end2 - start2
+        return (value - start1) / k1 * k2 + start2
+
     
     def beep(self): # гудок
         self.ev3.speaker.beep(300)
@@ -102,8 +261,16 @@ class Robot:
         self.right_motor.stop()
 
 
+
     # езда
     def ride_mm(self, v, mm): # по миллиметрам
+        # deg = self.left_motor.angle()
+        # while abs(deg - self.left_motor.angle()) < self.mm_to_deg(mm):
+        #     self.left_motor.run(v*abs(1-abs(((self.mm_to_deg(mm)/2)-abs(deg - self.left_motor.angle()))/(self.mm_to_deg(mm)/2)))**0.5+50)
+        #     self.right_motor.run(v*abs(1-abs(((self.mm_to_deg(mm)/2)-abs(deg - self.left_motor.angle()))/(self.mm_to_deg(mm)/2)))**0.5+50)
+        # self.left_motor.stop()
+        # self.right_motor.stop()
+
         deg = self.left_motor.angle()
         while abs(deg - self.left_motor.angle()) < self.mm_to_deg(mm):
             self.left_motor.run(v)
@@ -177,7 +344,7 @@ class Robot:
     # повороты
     def tank_turn(self, degrees): # танковый по углу
         deg = self.left_motor.angle()
-        while abs(self.left_motor.angle() - deg) < abs(degrees) * 180 / self.d:
+        while abs(self.left_motor.angle() - deg) < abs(degrees) * self.S / self.d:
             self.left_motor.run(300 * degrees // abs(degrees))
             self.right_motor.run(-300 * degrees // abs(degrees))
         self.left_motor.stop()
@@ -470,6 +637,9 @@ class Robot:
         self.mid_motor.run_angle(-300, degrees)
         self.mid_motor.hold()
 
+    def close_color(self):
+        self.sensor_motor.run_until_stalled(300, duty_limit=50)
+
     # работа с объектами
     def objects_count(self, v, S, mm): # подсчёт
         obj = False
@@ -577,7 +747,7 @@ class Robot:
         while self.LS_left.reflection() > thereshold or self.LS_right.reflection() > thereshold:
             self.left_motor.run(-v)
             self.right_motor.run(-v)
-            if self.LS_left.reflection() < thereshold30:
+            if self.LS_left.reflection() < thereshold:
                 while self.LS_left.reflection() < thereshold:
                     self.left_motor.run(v)
                     self.right_motor.run(v/2)
@@ -654,12 +824,117 @@ class Robot:
     #     self.right_motor.stop()
     #     return [pers_list, n]
 
-
+    def get_cube(self, dir, n):
+        if dir:
+            self.tank_turn(90)
+        else:
+            self.tank_turn(-90)
+        
+        self.ride_mm(300, 40*n+20)
+        self.close()
+        self.tank_turn(180)
+        self.ride_mm(300, 40*n+20)
+        
+        if not dir:
+            self.tank_turn(90)
+        else:
+            self.tank_turn(-90)
 
 
 
     def main(self):
         # -----------------------------------------------КОД-----------------------------------------------
+        self.pid_reg(300, 5, 0, 0, 3)
+        self.tank_turn(180)
+        right_cubes = []
+        left_cubes = []
+        self.pid_reg(300, 5, 0, 0, 1, 0)
+        self.ride_mm(-300, 35)
+        print(self.US.distance())
+        right_cubes.append(self.US.distance() < 250) # Б4
+        self.ride_mm(300, 70)
+        self.pid_reg(300, 5, 0, 0, 1, 0)
+        self.ride_mm(-300, 35)
+        print(self.US.distance())
+        right_cubes.append(self.US.distance() < 250) # В4
+        self.ride_mm(300, 70)
+        self.pid_reg(300, 5, 0, 0, 1)
+        self.pid_reg(300, 5, 0, 0, 1, 0)
+        self.ride_mm(-300, 35)
+        print(self.US.distance())
+        right_cubes.append(self.US.distance() < 250) # Д4
+        self.ride_mm(300, 70)
+        self.pid_reg(300, 5, 0, 0, 1, 0)
+        self.ride_mm(-300, 35)
+        print(self.US.distance())
+        right_cubes.append(self.US.distance() < 250) # Е4
+        self.ride_mm(300, 70)
+        self.pid_reg(300, 5, 0, 0, 1)
+        self.tank_turn(180)
+        self.pid_reg(300, 5, 0, 0, 1, 0)
+        self.ride_mm(-300, 35)
+        print(self.US.distance())
+        left_cubes.insert(0, self.US.distance() < 250) # Е2
+        self.ride_mm(300, 70)
+        self.pid_reg(300, 5, 0, 0, 1, 0)
+        self.ride_mm(-300, 35)
+        print(self.US.distance())
+        left_cubes.insert(0, self.US.distance() < 250) # Д2
+        self.ride_mm(300, 70)
+        self.pid_reg(300, 5, 0, 0, 1)
+        self.pid_reg(300, 5, 0, 0, 1, 0)
+        self.ride_mm(-300, 35)
+        print(self.US.distance())
+        left_cubes.insert(0, self.US.distance() < 250) # В2
+        self.ride_mm(300, 70)
+        self.pid_reg(300, 5, 0, 0, 1, 0)
+        self.ride_mm(-300, 35)
+        print(self.US.distance())
+        left_cubes.insert(0, self.US.distance() < 250) # Б2
+        self.ride_mm(300, 70)
+        self.pid_reg(300, 5, 0, 0, 2)
+        self.close()
+        print(right_cubes)
+        print(left_cubes)
+        self.tank_turn(180)
+        self.pid_reg(300, 5, 0, 0, 1)
+        if not right_cubes[0]:
+            self.tank_turn(90)
+            self.pid_reg(300, 5, 0, 0, 1)
+            self.ride_mm(300, 70)
+            self.close_deg(-90)
+            self.ride_mm(-300, 70)
+            self.tank_turn(180)
+            self.pid_reg(300, 5, 0, 0, 1)
+            self.tank_turn(-90)
+            self.pid_reg(300, 5, 0, 0, 1)
+        elif not right_cubes[3]:
+            self.pid_reg(300, 5, 0, 0, 6)
+            self.tank_turn(90)
+            self.pid_reg(300, 5, 0, 0, 1)
+            self.ride_mm(300, 70)
+            self.close_deg(-90)
+            self.ride_mm(-300, 70)
+            self.tank_turn(180)
+            self.pid_reg(300, 5, 0, 0, 1)
+            self.tank_turn(-90)
+            self.pid_reg(300, 5, 0, 0, 7)
+        else:
+            self.pid_reg(300, 5, 0, 0, 3)
+            self.tank_turn(90)
+            self.pid_reg(300, 5, 0, 0, 1)
+            self.ride_mm(300, 70)
+            self.close_deg(-90)
+            self.ride_mm(-300, 70)
+            self.tank_turn(180)
+            self.pid_reg(300, 5, 0, 0, 1)
+            self.tank_turn(-90)
+            self.pid_reg(300, 5, 0, 0, 4)
+        for d in range(2):
+            for i in range(3):
+                self.get_cube(d, i)
+                
+        
         
         wait(10000)
 
