@@ -64,7 +64,7 @@ class Robot:
 
         self.timer = StopWatch()
 
-        self.S = 165
+        self.S = 178
         self.d = 62.4
 
         self.min_sensor_data = 3
@@ -869,7 +869,95 @@ class Robot:
             # self.both_turn(1, -300, 100)
         return self.mid_motor.angle()-self.closed_enc
 
-    # def empty_finding(self):
+    def empty_finding(self):
+        current = self.empty.pop(0)
+        self.pid_reg(400, 5, 0, 0, current[0]+1)
+        wait(100)
+        if current[1] == 1:
+            self.tank_turn(90)
+            # self.both_turn(1, 300, 100)
+        else:
+            self.tank_turn(-90)
+            # self.both_turn(1, -300, 100)
+        self.ride_mm(300, 80)
+        self.open()
+        self.ride_mm(-300, 75)
+        wait(100)
+        if current[1] == 1:
+            if current[0] in (0, 3):
+                self.tank_turn(-45)
+                self.anti_turn(1, -300, 100)
+                # self.both_turn(1, 300, 100)
+            else:
+                self.tank_turn(45)
+                self.anti_turn(1, 300, 100)
+                # self.both_turn(1, -300, 100)
+        else:
+            if current[0] in (0, 3):
+                self.tank_turn(45)
+                self.anti_turn(1, 300, 100)
+                # self.both_turn(1, 300, 100)
+            else:
+                self.tank_turn(-45)
+                self.anti_turn(1, -300, 100)
+                # self.both_turn(1, -300, 100)
+        self.pid_reg(400, 5, 0, 0, 2)
+        if current[1] == 1:
+            if current[0] in (0, 3):
+                self.tank_turn(90)
+            else:
+                self.tank_turn(-90)
+        else:
+            if current[0] in (0, 3):
+                self.tank_turn(-90)
+            else:
+                self.tank_turn(90)
+        self.pid_reg(400, 5, 0, 0, 2)
+        if current[1] == 1:
+            if current[0] in (0, 3):
+                self.tank_turn(90)
+            else:
+                self.tank_turn(-90)
+        else:
+            if current[0] in (0, 3):
+                self.tank_turn(-90)
+            else:
+                self.tank_turn(90)
+        self.ride_mm(300, 90)
+        self.close()
+        self.ride_mm(-300, 90)
+        if current[1] == 1:
+            if current[0] in (0, 3):
+                self.tank_turn(90)
+            else:
+                self.tank_turn(-90)
+        else:
+            if current[0] in (0, 3):
+                self.tank_turn(-90)
+            else:
+                self.tank_turn(90)
+        self.pid_reg(400, 5, 0, 0, 2)
+        if current[1] == 1:
+            self.tank_turn(-90)
+        else:
+            self.tank_turn(90)
+        if current[1] == 1:
+            if current[0] in (0, 3):
+                self.pid_reg(450, 5, 0, 0, current[0]+3)
+            else:
+                self.pid_reg(450, 5, 0, 0, current[0]+3)
+        else:
+            if current[0] in (0, 3):
+                self.tank_turn(180)
+                self.pid_reg(450, 5, 0, 0, current[0]-1)
+            else:
+                self.tank_turn(180)
+                self.pid_reg(450, 5, 0, 0, current[0]-1)
+        self.pid_reg(400, 5, 0, 0, 2)
+        self.open()
+        self.tank_turn(180)
+
+
     
     
     def task_cubes_scan(self):
@@ -877,49 +965,73 @@ class Robot:
         self.tank_turn(180)
         self.right_cubes = []
         self.left_cubes = []
-        self.pid_reg(450, 5, 0, 0, 1, 0)
-        self.ride_mm(-450, 35)
+        self.pid_reg(350, 5, 0, 0, 1, 0)
+        self.ride_mm(-350, 33)
+        wait(100)
         print(self.US.distance())
         self.right_cubes.append(self.US.distance() < 250) # Б4
-        self.ride_mm(450, 80)
-        self.pid_reg(450, 5, 0, 0, 1, 0)
-        self.ride_mm(-450, 35)
+        if self.US.distance() < 250:
+            self.beep()
+        self.ride_mm(400, 80)
+        self.pid_reg(350, 5, 0, 0, 1, 0)
+        self.ride_mm(-350, 33)
+        wait(100)
         print(self.US.distance())
         self.right_cubes.append(self.US.distance() < 250) # В4
-        self.ride_mm(450, 80)
-        self.pid_reg(450, 5, 0, 0, 1)
-        self.pid_reg(450, 5, 0, 0, 1, 0)
-        self.ride_mm(-450, 35)
+        if self.US.distance() < 250:
+            self.beep()
+        self.ride_mm(400, 80)
+        self.pid_reg(400, 5, 0, 0, 1)
+        self.pid_reg(350, 5, 0, 0, 1, 0)
+        self.ride_mm(-350, 33)
+        wait(100)
         print(self.US.distance())
         self.right_cubes.append(self.US.distance() < 250) # Д4
-        self.ride_mm(450, 80)
-        self.pid_reg(450, 5, 0, 0, 1, 0)
-        self.ride_mm(-450, 35)
+        if self.US.distance() < 250:
+            self.beep()
+        self.ride_mm(400, 80)
+        self.pid_reg(350, 5, 0, 0, 1, 0)
+        self.ride_mm(-350, 33)
+        wait(100)
         print(self.US.distance())
         self.right_cubes.append(self.US.distance() < 250) # Е4
-        self.ride_mm(450, 80)
-        self.pid_reg(450, 5, 0, 0, 1)
+        if self.US.distance() < 250:
+            self.beep()
+        self.ride_mm(400, 80)
+        self.pid_reg(400, 5, 0, 0, 1)
         self.tank_turn(180)
-        self.pid_reg(450, 5, 0, 0, 1, 0)
-        self.ride_mm(-450, 35)
+        self.pid_reg(350, 5, 0, 0, 1, 0)
+        self.ride_mm(-350, 33)
+        wait(100)
         print(self.US.distance())
         self.left_cubes.insert(0, self.US.distance() < 250) # Е2
-        self.ride_mm(450, 80)
-        self.pid_reg(450, 5, 0, 0, 1, 0)
-        self.ride_mm(-450, 35)
+        if self.US.distance() < 250:
+            self.beep()
+        self.ride_mm(400, 80)
+        self.pid_reg(350, 5, 0, 0, 1, 0)
+        self.ride_mm(-350, 33)
+        wait(100)
         print(self.US.distance())
         self.left_cubes.insert(0, self.US.distance() < 250) # Д2
-        self.ride_mm(450, 80)
-        self.pid_reg(450, 5, 0, 0, 1)
-        self.pid_reg(450, 5, 0, 0, 1, 0)
-        self.ride_mm(-450, 35)
+        if self.US.distance() < 250:
+            self.beep()
+        self.ride_mm(400, 80)
+        self.pid_reg(400, 5, 0, 0, 1)
+        self.pid_reg(350, 5, 0, 0, 1, 0)
+        self.ride_mm(-350, 33)
+        wait(100)
         print(self.US.distance())
         self.left_cubes.insert(0, self.US.distance() < 250) # В2
-        self.ride_mm(450, 80)
-        self.pid_reg(450, 5, 0, 0, 1, 0)
-        self.ride_mm(-450, 35)
+        if self.US.distance() < 250:
+            self.beep()
+        self.ride_mm(400, 80)
+        self.pid_reg(350, 5, 0, 0, 1, 0)
+        self.ride_mm(-350, 33)
+        wait(100)
         print(self.US.distance())
         self.left_cubes.insert(0, self.US.distance() < 250) # Б2
+        if self.US.distance() < 250:
+            self.beep()
         self.ride_mm(450, 80)
         self.pid_reg(450, 5, 0, 0, 1)
         self.pid_reg_deg(450, 5, 0, 0, self.mm_to_deg(350))
@@ -937,7 +1049,7 @@ class Robot:
             self.tank_turn(180)
             self.pid_reg(450, 5, 0, 0, 1)
             self.tank_turn(-90)
-            self.pid_reg(450, 5, 0, 0, 1)
+            self.pid_reg(350, 5, 0, 0, 1)
         elif not self.right_cubes[3]:
             self.pid_reg(450, 5, 0, 0, 6)
             self.tank_turn(90)
@@ -948,7 +1060,8 @@ class Robot:
             self.tank_turn(180)
             self.pid_reg(450, 5, 0, 0, 1)
             self.tank_turn(-90)
-            self.pid_reg(450, 5, 0, 0, 7)
+            self.pid_reg(450, 5, 0, 0, 6)
+            self.pid_reg(350, 5, 0, 0, 1)
         else:
             self.pid_reg(450, 5, 0, 0, 3)
             self.tank_turn(90)
@@ -959,48 +1072,43 @@ class Robot:
             self.tank_turn(180)
             self.pid_reg(450, 5, 0, 0, 1)
             self.tank_turn(-90)
-            self.pid_reg(450, 5, 0, 0, 4)
-    
+            self.pid_reg(450, 5, 0, 0, 3)
+            self.pid_reg(350, 5, 0, 0, 1)
+
     def task_storage_cubes_arrangement(self):
-        self.print("123")
-        wait(10000)
         negative=0
         self.empty=[]
         for i in range(len(self.right_cubes)):
             if not self.right_cubes[i]:
-                self.empty.append((i+int(i>2), 1))
+                self.empty.append((i+int(i>1), 1))
         for i in range(len(self.left_cubes)):
             if not self.left_cubes[i]:
-                self.empty.append((i+int(i>2), -1))
-        self.print("".join(self.empty))
-        wait(10000)
-        self.print(str(self.empty))
-        wait(10000)
-        self.print(self.empty)
-        wait(10000)
-        # for d in range(2):
-        #     for i in range(3):
-        #         if self.get_cube(d, i, negative) < 10:
-        #             # self.tank_turn(180)
-        #             self.ride_mm(300, 10)
-        #             self.pid_reg(350, 5, 0, 0, 1)
-        #             self.open()
-        #             self.ride_mm(-300, 20)
-        #             self.tank_turn(180)
-        #             self.pid_reg(350, 5, 0, 0, 1)
-        #             # self.tank_turn(90)
-        #             # self.both_turn(1, 300, 100)
-        #             negative=1
-        #         else:
-        #             self.ride_mm(300, 10)
-        #             self.pid_reg(350, 5, 0, 0, 1)
-        #             self.empty_finding()
-        #             # self.ride_mm(-300, 20)
-        #             # self.tank_turn(180)
-        #             # self.pid_reg(350, 5, 0, 0, 1)
-        #             negative=1
-        # if not negative:
-        #     self.tank_turn(180)
+                self.empty.append((i+int(i>1), -1))
+        print(self.empty)
+        for d in range(2):
+            for i in range(3):
+                if self.get_cube(d, i, negative) < 10:
+                    # self.tank_turn(180)
+                    self.ride_mm(300, 10)
+                    self.pid_reg(350, 5, 0, 0, 1)
+                    self.open()
+                    self.ride_mm(-300, 20)
+                    self.tank_turn(180)
+                    self.pid_reg(350, 5, 0, 0, 1)
+                    # self.tank_turn(90)
+                    # self.both_turn(1, 300, 100)
+                    negative=1
+                else:
+                    self.ride_mm(300, 10)
+                    self.pid_reg(350, 5, 0, 0, 1)
+                    self.empty_finding()
+                    self.pid_reg(350, 5, 0, 0, 1)
+                    # self.ride_mm(-300, 20)
+                    # self.tank_turn(180)
+                    # self.pid_reg(350, 5, 0, 0, 1)
+                    negative=1
+        if not negative:
+            self.tank_turn(180)
 
 
     def main(self):
@@ -1036,8 +1144,7 @@ class Robot:
 
 robot = Robot()
 # robot.main()
-robot.tank_turn(360)
-# robot.task_cubes_scan()
-# robot.task_storage_cubes_arrangement()
+robot.task_cubes_scan()
+robot.task_storage_cubes_arrangement()
 
 wait(10000)
