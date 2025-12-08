@@ -1,7 +1,7 @@
 #!/usr/bin/env pybricks-micropython
 from math import floor, ceil
 from pybricks.hubs import EV3Brick
-from pybricks.ev3devices import Motor, ColorSensor, TouchSensor, UltrasonicSensor
+from pybricks.ev3devices import Motor, ColorSensor, TouchSensor, UltrasonicSensor, GyroSensor
 from pybricks.parameters import Port, Direction, Stop, Button, Color
 from pybricks.tools import wait, StopWatch
 from pybricks.robotics import DriveBase
@@ -48,11 +48,12 @@ class Robot:
         # self.LS_side_right = ColorSensor(Port.S4)
         # self.LS_side_left = ColorSensor(Port.S1)
 
-        self.US = UltrasonicSensor(Port.S4)
+        # self.US = UltrasonicSensor(Port.S4)
 
         # if self.LS_right.color() == Color.GREEN
 
-        # self.gyro_sensor = GyroSensor(Port.S4)
+        self.gyro_sensor = GyroSensor(Port.S4)
+        self.gyro_sensor.reset_angle(0)
 
 
 
@@ -351,6 +352,23 @@ class Robot:
         self.left_motor.stop()
         self.right_motor.stop()
 
+
+    def tank_turn_gyro(self, degrees): # танковый по гироскопу
+        current_deg = self.gyro_sensor.angle()
+        while abs(self.gyro_sensor.angle() - current_deg) < abs(degrees):
+            self.left_motor.run(300 * degrees // abs(degrees))
+            self.right_motor.run(-300 * degrees // abs(degrees))
+        wait(100)
+        while (self.gyro_sensor.angle() - current_deg) != degrees:
+            if self.gyro_sensor.angle() - current_deg > degrees:
+                self.left_motor.run(-100)
+                self.right_motor.run(100)
+            if self.gyro_sensor.angle() - current_deg < degrees:
+                self.left_motor.run(100)
+                self.right_motor.run(-100)
+        self.left_motor.stop()
+        self.right_motor.stop()
+
     def turn(self, n, v, t, back=0): # по линиям (датчик по направлению поворота (ближний))
         for _ in range(n):
             self.left_motor.run(v)
@@ -462,6 +480,25 @@ class Robot:
         self.right_motor.run(v - u + offset)
         
         wait(10)
+    
+
+    def empty_pid_reg_gyro(self,v,kp,ki,kd,target_angle): # по гироскопу
+        error = target_angle - self.gyro_sensor.angle()
+        self.error_i = error + self.error_i
+        error_d = error - self.last_error
+
+        p = kp * error
+        i = ki * self.error_i
+        d = kd * error_d
+
+        u = p + i + d
+        
+        self.last_error = error
+
+        self.left_motor.run(v + u)
+        self.right_motor.run(v - u)
+        
+        wait(10)
 
 
 
@@ -543,6 +580,17 @@ class Robot:
             wait(100)
             self.left_motor.stop()
             self.right_motor.stop()
+    
+
+    def pid_reg_gyro_deg(self,v,kp,ki,kd,target_angle,deg): # гироскопу
+        old_deg = self.left_motor.angle()
+        self.error_i = 0
+        self.last_error = 0
+        while self.left_motor.angle() - old_deg < deg:
+            self.empty_pid_reg_gyro(v,kp,ki,kd,target_angle)
+        self.left_motor.stop()
+        self.right_motor.stop()
+        
 
 
     # работа с уз
@@ -843,10 +891,10 @@ class Robot:
     def get_cube(self, dir, n, negative=0):
         if dir:
             # self.tank_turn(90)
-            self.both_turn(1, 300*(0.5-negative)*2, 100)
+            self.both_turn(1, -300*(0.5-negative)*2, 100)
         else:
             # self.tank_turn(-90)
-            self.both_turn(1, -300*(0.5-negative)*2, 100)
+            self.both_turn(1, 300*(0.5-negative)*2, 100)
         
         self.pid_reg_deg(300, 5, 0, 0, self.mm_to_deg(100*n+100))
         self.close()
@@ -869,8 +917,9 @@ class Robot:
             # self.both_turn(1, -300, 100)
         return self.mid_motor.angle()-self.closed_enc
 
-    def empty_finding(self):
-        current = self.empty.pop(0)
+    def empty_finding(self, empty):
+        current = empty.pop(0)
+        self.ride_mm(300, 20)
         self.pid_reg(400, 5, 0, 0, current[0]+1)
         wait(100)
         if current[1] == 1:
@@ -879,63 +928,34 @@ class Robot:
         else:
             self.tank_turn(-90)
             # self.both_turn(1, -300, 100)
-        self.ride_mm(300, 80)
+        if current[1] == 1:
+            if current[0] in (0, 3):
+                self.get_replaceble_turn_factor = 1
+            else:
+                self.get_replaceble_turn_factor = -1
+        else:
+            if current[0] in (0, 3):
+                self.get_replaceble_turn_factor = -1
+            else:
+                self.get_replaceble_turn_factor = 1
+        self.ride_mm(300, 75)
         self.open()
-        self.ride_mm(-300, 75)
+        self.ride_mm(-300, 70)
         wait(100)
-        if current[1] == 1:
-            if current[0] in (0, 3):
-                self.tank_turn(-45)
-                self.anti_turn(1, -300, 100)
-                # self.both_turn(1, 300, 100)
-            else:
-                self.tank_turn(45)
-                self.anti_turn(1, 300, 100)
-                # self.both_turn(1, -300, 100)
-        else:
-            if current[0] in (0, 3):
-                self.tank_turn(45)
-                self.anti_turn(1, 300, 100)
-                # self.both_turn(1, 300, 100)
-            else:
-                self.tank_turn(-45)
-                self.anti_turn(1, -300, 100)
-                # self.both_turn(1, -300, 100)
+        self.tank_turn(-90*self.get_replaceble_turn_factor)
+        # self.tank_turn(-45*self.get_replaceble_turn_factor)
+        # self.anti_turn(1, -300*self.get_replaceble_turn_factor, 100)
+        self.ride_mm(300, 20)
         self.pid_reg(400, 5, 0, 0, 2)
-        if current[1] == 1:
-            if current[0] in (0, 3):
-                self.tank_turn(90)
-            else:
-                self.tank_turn(-90)
-        else:
-            if current[0] in (0, 3):
-                self.tank_turn(-90)
-            else:
-                self.tank_turn(90)
+        self.tank_turn(90*self.get_replaceble_turn_factor)
+        self.ride_mm(300, 20)
         self.pid_reg(400, 5, 0, 0, 2)
-        if current[1] == 1:
-            if current[0] in (0, 3):
-                self.tank_turn(90)
-            else:
-                self.tank_turn(-90)
-        else:
-            if current[0] in (0, 3):
-                self.tank_turn(-90)
-            else:
-                self.tank_turn(90)
+        self.tank_turn(90*self.get_replaceble_turn_factor)
         self.ride_mm(300, 90)
         self.close()
         self.ride_mm(-300, 90)
-        if current[1] == 1:
-            if current[0] in (0, 3):
-                self.tank_turn(90)
-            else:
-                self.tank_turn(-90)
-        else:
-            if current[0] in (0, 3):
-                self.tank_turn(-90)
-            else:
-                self.tank_turn(90)
+        self.tank_turn(90*self.get_replaceble_turn_factor)
+        self.ride_mm(300, 20)
         self.pid_reg(400, 5, 0, 0, 2)
         if current[1] == 1:
             self.tank_turn(-90)
@@ -943,172 +963,24 @@ class Robot:
             self.tank_turn(90)
         if current[1] == 1:
             if current[0] in (0, 3):
+                self.ride_mm(300, 20)
                 self.pid_reg(450, 5, 0, 0, current[0]+3)
             else:
-                self.pid_reg(450, 5, 0, 0, current[0]+3)
+                self.ride_mm(300, 20)
+                self.pid_reg(450, 5, 0, 0, current[0]-1)
         else:
             if current[0] in (0, 3):
-                self.tank_turn(180)
-                self.pid_reg(450, 5, 0, 0, current[0]-1)
+                self.ride_mm(300, 20)
+                self.pid_reg(450, 5, 0, 0, current[0]+3)
             else:
-                self.tank_turn(180)
+                self.ride_mm(300, 20)
                 self.pid_reg(450, 5, 0, 0, current[0]-1)
         self.pid_reg(400, 5, 0, 0, 2)
         self.open()
+        self.ride_mm(-300, 20)
         self.tank_turn(180)
+        return empty
 
-
-    
-    
-    def task_cubes_scan(self):
-        self.pid_reg(450, 5, 0, 0, 3)
-        self.tank_turn(180)
-        self.right_cubes = []
-        self.left_cubes = []
-        self.pid_reg(350, 5, 0, 0, 1, 0)
-        self.ride_mm(-350, 33)
-        wait(100)
-        print(self.US.distance())
-        self.right_cubes.append(self.US.distance() < 250) # Б4
-        if self.US.distance() < 250:
-            self.beep()
-        self.ride_mm(400, 80)
-        self.pid_reg(350, 5, 0, 0, 1, 0)
-        self.ride_mm(-350, 33)
-        wait(100)
-        print(self.US.distance())
-        self.right_cubes.append(self.US.distance() < 250) # В4
-        if self.US.distance() < 250:
-            self.beep()
-        self.ride_mm(400, 80)
-        self.pid_reg(400, 5, 0, 0, 1)
-        self.pid_reg(350, 5, 0, 0, 1, 0)
-        self.ride_mm(-350, 33)
-        wait(100)
-        print(self.US.distance())
-        self.right_cubes.append(self.US.distance() < 250) # Д4
-        if self.US.distance() < 250:
-            self.beep()
-        self.ride_mm(400, 80)
-        self.pid_reg(350, 5, 0, 0, 1, 0)
-        self.ride_mm(-350, 33)
-        wait(100)
-        print(self.US.distance())
-        self.right_cubes.append(self.US.distance() < 250) # Е4
-        if self.US.distance() < 250:
-            self.beep()
-        self.ride_mm(400, 80)
-        self.pid_reg(400, 5, 0, 0, 1)
-        self.tank_turn(180)
-        self.pid_reg(350, 5, 0, 0, 1, 0)
-        self.ride_mm(-350, 33)
-        wait(100)
-        print(self.US.distance())
-        self.left_cubes.insert(0, self.US.distance() < 250) # Е2
-        if self.US.distance() < 250:
-            self.beep()
-        self.ride_mm(400, 80)
-        self.pid_reg(350, 5, 0, 0, 1, 0)
-        self.ride_mm(-350, 33)
-        wait(100)
-        print(self.US.distance())
-        self.left_cubes.insert(0, self.US.distance() < 250) # Д2
-        if self.US.distance() < 250:
-            self.beep()
-        self.ride_mm(400, 80)
-        self.pid_reg(400, 5, 0, 0, 1)
-        self.pid_reg(350, 5, 0, 0, 1, 0)
-        self.ride_mm(-350, 33)
-        wait(100)
-        print(self.US.distance())
-        self.left_cubes.insert(0, self.US.distance() < 250) # В2
-        if self.US.distance() < 250:
-            self.beep()
-        self.ride_mm(400, 80)
-        self.pid_reg(350, 5, 0, 0, 1, 0)
-        self.ride_mm(-350, 33)
-        wait(100)
-        print(self.US.distance())
-        self.left_cubes.insert(0, self.US.distance() < 250) # Б2
-        if self.US.distance() < 250:
-            self.beep()
-        self.ride_mm(450, 80)
-        self.pid_reg(450, 5, 0, 0, 1)
-        self.pid_reg_deg(450, 5, 0, 0, self.mm_to_deg(350))
-        self.close()
-        print(self.right_cubes)
-        print(self.left_cubes)
-        self.tank_turn(180)
-        self.pid_reg(450, 5, 0, 0, 1)
-        if not self.right_cubes[0]:
-            self.tank_turn(90)
-            self.pid_reg(450, 5, 0, 0, 1)
-            self.ride_mm(450, 70)
-            self.open()
-            self.ride_mm(-450, 70)
-            self.tank_turn(180)
-            self.pid_reg(450, 5, 0, 0, 1)
-            self.tank_turn(-90)
-            self.pid_reg(350, 5, 0, 0, 1)
-        elif not self.right_cubes[3]:
-            self.pid_reg(450, 5, 0, 0, 6)
-            self.tank_turn(90)
-            self.pid_reg(450, 5, 0, 0, 1)
-            self.ride_mm(450, 70)
-            self.open()
-            self.ride_mm(-450, 70)
-            self.tank_turn(180)
-            self.pid_reg(450, 5, 0, 0, 1)
-            self.tank_turn(-90)
-            self.pid_reg(450, 5, 0, 0, 6)
-            self.pid_reg(350, 5, 0, 0, 1)
-        else:
-            self.pid_reg(450, 5, 0, 0, 3)
-            self.tank_turn(90)
-            self.pid_reg(450, 5, 0, 0, 1)
-            self.ride_mm(450, 70)
-            self.open()
-            self.ride_mm(-450, 70)
-            self.tank_turn(180)
-            self.pid_reg(450, 5, 0, 0, 1)
-            self.tank_turn(-90)
-            self.pid_reg(450, 5, 0, 0, 3)
-            self.pid_reg(350, 5, 0, 0, 1)
-
-    def task_storage_cubes_arrangement(self):
-        negative=0
-        self.empty=[]
-        for i in range(len(self.right_cubes)):
-            if not self.right_cubes[i]:
-                self.empty.append((i+int(i>1), 1))
-        for i in range(len(self.left_cubes)):
-            if not self.left_cubes[i]:
-                self.empty.append((i+int(i>1), -1))
-        print(self.empty)
-        for d in range(2):
-            for i in range(3):
-                if self.get_cube(d, i, negative) < 10:
-                    # self.tank_turn(180)
-                    self.ride_mm(300, 10)
-                    self.pid_reg(350, 5, 0, 0, 1)
-                    self.open()
-                    self.ride_mm(-300, 20)
-                    self.tank_turn(180)
-                    self.pid_reg(350, 5, 0, 0, 1)
-                    # self.tank_turn(90)
-                    # self.both_turn(1, 300, 100)
-                    negative=1
-                else:
-                    self.ride_mm(300, 10)
-                    self.pid_reg(350, 5, 0, 0, 1)
-                    self.empty_finding()
-                    self.pid_reg(350, 5, 0, 0, 1)
-                    # self.ride_mm(-300, 20)
-                    # self.tank_turn(180)
-                    # self.pid_reg(350, 5, 0, 0, 1)
-                    negative=1
-        if not negative:
-            self.tank_turn(180)
 
 
     def main(self):
@@ -1119,32 +991,114 @@ class Robot:
         #     wait(50)
         #     self.close_deg(-80)
         #     wait(50)
-        
-        
-        
-                
-        
-        
         wait(10000)
-
-
-
-
-
-
-
-
-
-
 
 
 # конец класса
 
 
+# def task_cubes_scan():
+#     global robot
+
+#     def scan(cubes_list):
+#         global robot
+#         for _ in range(2):
+#             for _ in range(2):
+#                 robot.pid_reg(350, 5, 0, 0, 1, 0)
+#                 robot.ride_mm(-350, 33)
+#                 wait(100)
+#                 print(robot.US.distance())
+#                 cubes_list.append(robot.US.distance() < 250)
+#                 if robot.US.distance() < 250:
+#                     robot.beep()
+#                 robot.ride_mm(400, 80)
+#             robot.pid_reg(400, 5, 0, 0, 1)
+#         return cubes_list
+    
+
+#     def transportation(n):
+#         global robot
+#         if n:
+#             robot.pid_reg(450, 5, 0, 0, n)
+#         robot.tank_turn(90)
+#         robot.ride_mm(450, 20)
+#         robot.pid_reg(450, 5, 0, 0, 1)
+#         robot.ride_mm(450, 70)
+#         robot.open()
+#         robot.ride_mm(-450, 70)
+#         robot.tank_turn(180)
+#         robot.pid_reg(450, 5, 0, 0, 1)
+#         robot.tank_turn(-90)
+#         if n:
+#             robot.pid_reg(450, 5, 0, 0, n)
+#         robot.pid_reg(350, 5, 0, 0, 1)
+
+
+#     right_cubes = []
+#     left_cubes = []
+#     robot.pid_reg(450, 5, 0, 0, 3)
+#     robot.tank_turn(180)
+#     scan(right_cubes) # Б4 В4 Д4 Е4
+#     robot.tank_turn(180)
+#     robot.ride_mm(300, 20)
+#     scan(left_cubes) # Е2 Д2 В2 Б2
+
+#     robot.pid_reg_deg(450, 5, 0, 0, robot.mm_to_deg(350))
+#     robot.close()
+#     print(right_cubes)
+#     print(left_cubes)
+#     robot.tank_turn(190)
+#     robot.pid_reg(450, 5, 0, 0, 1)
+#     if not right_cubes[0]:
+#         transportation(0)
+#     elif not right_cubes[3]:
+#         transportation(6)
+#     else:
+#         transportation(3)
+#     return right_cubes, left_cubes
+
+
+# def task_storage_cubes_arrangement(right_cubes, left_cubes):
+#     global robot
+#     negative=1
+#     empty=[]
+#     for i in range(len(right_cubes)):
+#         if not right_cubes[i]:
+#             empty.append((i+int(i>1), 1))
+#     for i in range(len(left_cubes)):
+#         if not left_cubes[i]:
+#             empty.append((i+int(i>1), -1))
+#     print(empty)
+#     for d in range(2):
+#         for i in range(3):
+#             if robot.get_cube(d, i, negative) < 10:
+#                 # robot.tank_turn(180)
+#                 robot.ride_mm(300, 10)
+#                 robot.pid_reg(350, 5, 0, 0, 1)
+#                 robot.open()
+#                 robot.ride_mm(-300, 20)
+#                 robot.tank_turn(180)
+#                 robot.pid_reg(350, 5, 0, 0, 1)
+#                 # robot.tank_turn(90)
+#                 # robot.both_turn(1, 300, 100)
+#                 negative=0
+#             else:
+#                 robot.ride_mm(300, 10)
+#                 robot.pid_reg(350, 5, 0, 0, 1)
+#                 robot.empty_finding(empty)
+#                 robot.pid_reg(350, 5, 0, 0, 1)
+#                 # robot.ride_mm(-300, 20)
+#                 # robot.tank_turn(180)
+#                 # robot.pid_reg(350, 5, 0, 0, 1)
+#                 negative=0
+#     robot.ride_mm(300, 100)
+
 
 robot = Robot()
 # robot.main()
-robot.task_cubes_scan()
-robot.task_storage_cubes_arrangement()
+# right_cubes, left_cubes = task_cubes_scan()
+# task_storage_cubes_arrangement(right_cubes, left_cubes)
+
+
 
 wait(10000)
